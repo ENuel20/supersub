@@ -84,3 +84,30 @@ supersub --list-langs https://youtu.be/dQw4w9WgXcQ
 ```
 
 Videos with captions disabled, or with no captions in the language you asked for, get a clear error instead of a stack trace.
+
+## Restricting usage to your IP
+
+If you want to limit who can run this installation of `supersub`, you can configure a small IP whitelist. There are two ways to configure allowed public IPs:
+
+1. Environment variable `SUPERSUB_ALLOWED_IPS` (comma-separated):
+
+```bash
+export SUPERSUB_ALLOWED_IPS="203.0.113.5,198.51.100.42"
+```
+
+2. Per-user config file `~/.supersub_allowed_ips` containing comma-separated IPs:
+
+```
+203.0.113.5,198.51.100.42
+```
+
+The program will determine the current public IP using `https://api.ipify.org` and refuse to run unless the public IP is listed. To check your public IP from the shell:
+
+```bash
+curl -sS https://api.ipify.org?format=json | jq -r .ip
+```
+
+Notes:
+- This restriction only affects this installation (local environment). Anyone who has a copy of the source or a fork can remove the check unless you close/delete the repo.
+- To effectively stop public use, consider making the repository private or deleting it from GitHub, and removing any published package from PyPI.
+

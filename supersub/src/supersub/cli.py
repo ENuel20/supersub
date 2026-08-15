@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from typing import Optional, Sequence, TextIO
+
+import requests
 
 from supersub import __version__
 from supersub.format import format_json, format_plain, format_srt, format_timestamps
@@ -15,6 +18,71 @@ from supersub.transcript import (
     list_tracks,
 )
 from supersub.url import InvalidYouTubeURL, extract_video_id
+
+
+def _read_allowed_ips() -> list[str]:
+    """Return allowed public IPs from env or a config file.
+
+    Precedence:
+      1. `SUPERSUB_ALLOWED_IPS` environment variable (comma-separated)
+      2. `~/.supersub_allowed_ips` file containing comma-separated IPs
+    """
+    env = os.environ.get("SUPERSUB_ALLOWED_IPS")
+    if env:
+        return [ip.strip() for ip in env.split(",") if ip.strip()]
+    cfg = os.path.expanduser("~/.supersub_allowed_ips")
+    try:
+        with open(cfg, "r", encoding="utf-8") as fh:
+            contents = fh.read().strip()
+            return [ip.strip() for ip in contents.split(",") if ip.strip()]
+    except Exception:
+        return []
+
+
+def _get_public_ip(timeout: float = 4.0) -> Optional[str]:
+    """Query a public IP service and return the IP string, or None on failure."""
+    try:
+        r = requests.get("https://api.ipify.org?format=json", timeout=timeout)
+        r.raise_for_status()
+        data = r.json()
+        return data.get("ip")
+    except Exception:
+        return None
+
+
+def _enforce_ip_whitelist() -> bool:
+    """Return True if the current public IP is allowed, False otherwise.
+
+    If no allowed IPs are configured the function returns False.
+    """
+    allowed = _read_allowed_ips()
+    if not allowed:
+        print(
+            "Error: SUPERSUB_ALLOWED_IPS not configured.\n"
+            "Create ~/.supersub_allowed_ips or set SUPERSUB_ALLOWED_IPS to a comma-separated list of your allowed public IPs.",
+            file=sys.stderr,
+        )
+        return False
+
+    public_ip = _get_public_ip()
+    if not public_ip:
+        print(
+            "Error: Could not determine public IP (network error). Aborting.",
+            file=sys.stderr,
+        )
+        return False
+
+    if public_ip not in allowed:
+        print(
+            f"This installation of supersub is restricted to specific public IP addresses.\n"
+            f"Your current public IP: {public_ip}\n"
+            f"Allowed IPs: {', '.join(allowed)}",
+            file=sys.stderr,
+        )
+        return False
+
+    return True
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -78,6 +146,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    # Enforce IP whitelist before doing any network actions
+    if not _enforce_ip_whitelist():
+        return 1
 
     try:
         video_id = extract_video_id(args.url)
