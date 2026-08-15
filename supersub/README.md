@@ -2,6 +2,8 @@
 
 Fetch the transcript of a YouTube video from the command line.
 
+⚠️ **Warning**: This tool uses unofficial YouTube APIs that may violate YouTube's Terms of Service. It may break at any time if YouTube changes their infrastructure or if YouTube requests it be taken down. Use at your own risk.
+
 ```bash
 supersub https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
